@@ -1,20 +1,13 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
-
-declare const { time };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-
-const BehaviorSubject = Rx.BehaviorSubject;
-const Observable = Rx.Observable;
-const ObjectUnsubscribedError = Rx.ObjectUnsubscribedError;
+import { hot, expectObservable } from '../helpers/marble-testing';
+import { BehaviorSubject, Subject, ObjectUnsubscribedError, Observable, of } from 'rxjs';
+import { tap, mergeMapTo } from 'rxjs/operators';
 
 /** @test {BehaviorSubject} */
 describe('BehaviorSubject', () => {
   it('should extend Subject', () => {
     const subject = new BehaviorSubject(null);
-    expect(subject).to.be.instanceof(Rx.Subject);
+    expect(subject).to.be.instanceof(Subject);
   });
 
   it('should throw if it has received an error and getValue() is called', () => {
@@ -99,7 +92,7 @@ describe('BehaviorSubject', () => {
 
   it('should not pass values nexted after a complete', () => {
     const subject = new BehaviorSubject('init');
-    const results = [];
+    const results: string[] = [];
 
     subject.subscribe((x: string) => {
       results.push(x);
@@ -137,22 +130,24 @@ describe('BehaviorSubject', () => {
 
   it('should replay the previous value when subscribed', () => {
     const behaviorSubject = new BehaviorSubject('0');
-    function feedNextIntoSubject(x) { behaviorSubject.next(x); }
-    function feedErrorIntoSubject(err) { behaviorSubject.error(err); }
+    function feedNextIntoSubject(x: string) { behaviorSubject.next(x); }
+    function feedErrorIntoSubject(err: any) { behaviorSubject.error(err); }
     function feedCompleteIntoSubject() { behaviorSubject.complete(); }
 
     const sourceTemplate =  '-1-2-3----4------5-6---7--8----9--|';
-    const subscriber1 = hot('      (a|)                         ').mergeMapTo(behaviorSubject);
+    const subscriber1 = hot('      (a|)                         ').pipe(mergeMapTo(behaviorSubject));
     const unsub1 =          '                     !             ';
     const expected1   =     '      3---4------5-6--             ';
-    const subscriber2 = hot('            (b|)                   ').mergeMapTo(behaviorSubject);
+    const subscriber2 = hot('            (b|)                   ').pipe(mergeMapTo(behaviorSubject));
     const unsub2 =          '                         !         ';
     const expected2   =     '            4----5-6---7--         ';
-    const subscriber3 = hot('                           (c|)    ').mergeMapTo(behaviorSubject);
+    const subscriber3 = hot('                           (c|)    ').pipe(mergeMapTo(behaviorSubject));
     const expected3   =     '                           8---9--|';
 
-    expectObservable(hot(sourceTemplate).do(
+    expectObservable(hot(sourceTemplate).pipe(
+      tap(
       feedNextIntoSubject, feedErrorIntoSubject, feedCompleteIntoSubject
+      )
     )).toBe(sourceTemplate);
     expectObservable(subscriber1, unsub1).toBe(expected1);
     expectObservable(subscriber2, unsub2).toBe(expected2);
@@ -161,22 +156,26 @@ describe('BehaviorSubject', () => {
 
   it('should emit complete when subscribed after completed', () => {
     const behaviorSubject = new BehaviorSubject('0');
-    function feedNextIntoSubject(x) { behaviorSubject.next(x); }
-    function feedErrorIntoSubject(err) { behaviorSubject.error(err); }
+    function feedNextIntoSubject(x: string) { behaviorSubject.next(x); }
+    function feedErrorIntoSubject(err: any) { behaviorSubject.error(err); }
     function feedCompleteIntoSubject() { behaviorSubject.complete(); }
 
     const sourceTemplate =  '-1-2-3--4--|';
-    const subscriber1 = hot('               (a|)').mergeMapTo(behaviorSubject);
+    const subscriber1 = hot('               (a|)').pipe(
+      mergeMapTo(behaviorSubject)
+    );
     const expected1   =     '               |   ';
 
-    expectObservable(hot(sourceTemplate).do(
-      feedNextIntoSubject, feedErrorIntoSubject, feedCompleteIntoSubject
+    expectObservable(hot(sourceTemplate).pipe(
+      tap(
+        feedNextIntoSubject, feedErrorIntoSubject, feedCompleteIntoSubject
+      )
     )).toBe(sourceTemplate);
     expectObservable(subscriber1).toBe(expected1);
   });
 
   it('should be an Observer which can be given to Observable.subscribe', (done: MochaDone) => {
-    const source = Observable.of(1, 2, 3, 4, 5);
+    const source = of(1, 2, 3, 4, 5);
     const subject = new BehaviorSubject(0);
     const expected = [0, 1, 2, 3, 4, 5];
 

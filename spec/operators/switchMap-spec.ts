@@ -1,17 +1,12 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { switchMap, mergeMap, map, takeWhile } from 'rxjs/operators';
+import { concat, defer, of, Observable } from 'rxjs';
 
-declare const { asDiagram };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+declare function asDiagram(arg: string): Function;
 
 /** @test {switchMap} */
-describe('Observable.prototype.switchMap', () => {
+describe('switchMap', () => {
   asDiagram('switchMap(i => 10*i\u2014\u201410*i\u2014\u201410*i\u2014| )')
   ('should map-and-flatten each item to an Observable', () => {
     const e1 =    hot('--1-----3--5-------|');
@@ -20,31 +15,81 @@ describe('Observable.prototype.switchMap', () => {
     const expected =  '--x-x-x-y-yz-z-z---|';
     const values = {x: 10, y: 30, z: 50};
 
-    const result = e1.switchMap(x => e2.map(i => i * x));
+    const result = e1.pipe(switchMap(x => e2.pipe(map(i => i * +x))));
 
     expectObservable(result).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
-  it('should switch with a selector function', (done: MochaDone) => {
-    const a = Observable.of(1, 2, 3);
-    const expected = ['a1', 'b1', 'c1', 'a2', 'b2', 'c2', 'a3', 'b3', 'c3'];
-    a.switchMap((x: number) => Observable.of('a' + x, 'b' + x, 'c' + x))
-      .subscribe((x: string) => {
-        expect(x).to.equal(expected.shift());
-      }, null, done);
+  it('should support the deprecated resultSelector', () => {
+    const results: Array<number[]> = [];
+
+    of(1, 2, 3).pipe(
+      switchMap(
+        x => of(x, x + 1, x + 2),
+        (a, b, i, ii) => [a, b, i, ii]
+      )
+    )
+    .subscribe({
+      next (value) {
+        results.push(value);
+      },
+      error(err) {
+        throw err;
+      },
+      complete() {
+        expect(results).to.deep.equal([
+          [1, 1, 0, 0],
+          [1, 2, 0, 1],
+          [1, 3, 0, 2],
+          [2, 2, 1, 0],
+          [2, 3, 1, 1],
+          [2, 4, 1, 2],
+          [3, 3, 2, 0],
+          [3, 4, 2, 1],
+          [3, 5, 2, 2],
+        ]);
+      }
+    });
+  });
+
+  it('should support a void resultSelector (still deprecated)', () => {
+    const results: number[] = [];
+
+    of(1, 2, 3).pipe(
+      switchMap(
+        x => of(x, x + 1, x + 2),
+        void 0
+      )
+    )
+    .subscribe({
+      next (value) {
+        results.push(value);
+      },
+      error(err) {
+        throw err;
+      },
+      complete() {
+        expect(results).to.deep.equal([
+          1, 2, 3, 2, 3, 4, 3, 4, 5
+        ]);
+      }
+    });
   });
 
   it('should unsub inner observables', () => {
-    const unsubbed = [];
+    const unsubbed: string[] = [];
 
-    Observable.of('a', 'b').switchMap((x: string) =>
-      Observable.create((subscriber: Rx.Subscriber<string>) => {
-        subscriber.complete();
-        return () => {
-          unsubbed.push(x);
-        };
-      })).subscribe();
+    of('a', 'b').pipe(
+      switchMap(x =>
+        new Observable<string>((subscriber) => {
+          subscriber.complete();
+          return () => {
+            unsubbed.push(x);
+          };
+        })
+      )
+    ).subscribe();
 
     expect(unsubbed).to.deep.equal(['a', 'b']);
   });
@@ -55,12 +100,12 @@ describe('Observable.prototype.switchMap', () => {
     const y =   cold(                   '---f---g---h---i--|');
     const ysubs =    '                   ^                 !';
     const e1 =   hot('---------x---------y---------|        ');
-    const e1subs =   '^                                    !';
+    const e1subs =   '^                            !        ';
     const expected = '-----------a--b--c----f---g---h---i--|';
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -72,29 +117,11 @@ describe('Observable.prototype.switchMap', () => {
     const e1 =   hot('-------x-----y---|');
     const e1subs =   '^      !          ';
     const expected = '-------#          ';
-    function project() {
+    function project(): any[] {
       throw 'error';
     }
 
-    expectObservable(e1.switchMap(<any>project)).toBe(expected);
-    expectSubscriptions(e1.subscriptions).toBe(e1subs);
-  });
-
-  it('should raise error when resultSelector throws', () => {
-    const x =   cold(         '--a--b--c--d--e--|   ');
-    const xsubs =    '         ^ !                  ';
-    const e1 =   hot('---------x---------y---------|');
-    const e1subs =   '^          !                  ';
-    const expected = '-----------#                  ';
-
-    function selector() {
-      throw 'error';
-    }
-
-    const result = e1.switchMap((value: string) => x, selector);
-
-    expectObservable(result).toBe(expected);
-    expectSubscriptions(x.subscriptions).toBe(xsubs);
+    expectObservable(e1.pipe(switchMap(project))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -110,7 +137,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -130,15 +157,41 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1
-      .mergeMap((x: string) => Observable.of(x))
-      .switchMap((value: string) => observableLookup[value])
-      .mergeMap((x: string) => Observable.of(x));
+    const result = e1.pipe(
+      mergeMap(x => of(x)),
+      switchMap(value => observableLookup[value]),
+      mergeMap(x => of(x)),
+    );
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
     expectSubscriptions(y.subscriptions).toBe(ysubs);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
+  });
+
+  it('should stop listening to a synchronous observable when unsubscribed', () => {
+    const sideEffects: number[] = [];
+    const synchronousObservable = concat(
+      defer(() => {
+        sideEffects.push(1);
+        return of(1);
+      }),
+      defer(() => {
+        sideEffects.push(2);
+        return of(2);
+      }),
+      defer(() => {
+        sideEffects.push(3);
+        return of(3);
+      })
+    );
+
+    of(null).pipe(
+      switchMap(() => synchronousObservable),
+      takeWhile((x) => x != 2) // unsubscribe at the second side-effect
+    ).subscribe(() => { /* noop */ });
+
+    expect(sideEffects).to.deep.equal([1, 2]);
   });
 
   it('should switch inner cold observables, inner never completes', () => {
@@ -147,12 +200,12 @@ describe('Observable.prototype.switchMap', () => {
     const y =   cold(                   '---f---g---h---i--');
     const ysubs =    '                   ^                 ';
     const e1 =   hot('---------x---------y---------|       ');
-    const e1subs =   '^                                    ';
+    const e1subs =   '^                            !       ';
     const expected = '-----------a--b--c----f---g---h---i--';
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -171,7 +224,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -183,14 +236,14 @@ describe('Observable.prototype.switchMap', () => {
     const x =   cold(         '--a--b--#--d--e--|          ');
     const xsubs =    '         ^       !                   ';
     const y =   cold(                   '---f---g---h---i--');
-    const ysubs = [];
+    const ysubs: string[] = [];
     const e1 =   hot('---------x---------y---------|       ');
     const e1subs =   '^                !                   ';
     const expected = '-----------a--b--#                   ';
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -204,12 +257,12 @@ describe('Observable.prototype.switchMap', () => {
     const y =    hot('--p-o-o-p-------------f---g---h---i--|');
     const ysubs =    '                   ^                 !';
     const e1 =   hot('---------x---------y---------|        ');
-    const e1subs =   '^                                    !';
+    const e1subs =   '^                            !        ';
     const expected = '-----------c--d--e----f---g---h---i--|';
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -228,7 +281,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -242,12 +295,12 @@ describe('Observable.prototype.switchMap', () => {
     const xsubs =    '         (^!)                 ';
     const ysubs =    '                   ^          ';
     const e1 =   hot('---------x---------y---------|');
-    const e1subs =   '^                             ';
+    const e1subs =   '^                            !';
     const expected = '------------------------------';
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -266,7 +319,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -285,7 +338,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected, undefined, 'sad');
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -304,7 +357,7 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x, y: y };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected, undefined, 'sad');
     expectSubscriptions(x.subscriptions).toBe(xsubs);
@@ -317,7 +370,7 @@ describe('Observable.prototype.switchMap', () => {
     const e1subs =   '(^!)';
     const expected = '|';
 
-    const result = e1.switchMap((value: any) => Observable.of(value));
+    const result = e1.pipe(switchMap(value => of(value)));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -328,7 +381,7 @@ describe('Observable.prototype.switchMap', () => {
     const e1subs =   '^';
     const expected = '-';
 
-    const result = e1.switchMap((value: any) => Observable.of(value));
+    const result = e1.pipe(switchMap(value => of(value)));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -339,7 +392,7 @@ describe('Observable.prototype.switchMap', () => {
     const e1subs =   '(^!)';
     const expected = '#';
 
-    const result = e1.switchMap((value: any) => Observable.of(value));
+    const result = e1.pipe(switchMap(value => of(value)));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -354,40 +407,10 @@ describe('Observable.prototype.switchMap', () => {
 
     const observableLookup = { x: x };
 
-    const result = e1.switchMap((value: string) => observableLookup[value]);
+    const result = e1.pipe(switchMap(value => observableLookup[value]));
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(x.subscriptions).toBe(xsubs);
-    expectSubscriptions(e1.subscriptions).toBe(e1subs);
-  });
-
-  it('should switch with resultSelector goodness', () => {
-    const x =   cold(         '--a--b--c--d--e--|           ');
-    const xsubs =    '         ^         !                  ';
-    const y =   cold(                   '---f---g---h---i--|');
-    const ysubs =    '                   ^                 !';
-    const e1 =   hot('---------x---------y---------|        ');
-    const e1subs =   '^                                    !';
-    const expected = '-----------a--b--c----f---g---h---i--|';
-
-    const observableLookup = { x: x, y: y };
-
-    const expectedValues = {
-      a: ['x', 'a', 0, 0],
-      b: ['x', 'b', 0, 1],
-      c: ['x', 'c', 0, 2],
-      f: ['y', 'f', 1, 0],
-      g: ['y', 'g', 1, 1],
-      h: ['y', 'h', 1, 2],
-      i: ['y', 'i', 1, 3]
-    };
-
-    const result = e1.switchMap((value: string) => observableLookup[value],
-      (innerValue, outerValue, innerIndex, outerIndex) => [innerValue, outerValue, innerIndex, outerIndex]);
-
-    expectObservable(result).toBe(expected, expectedValues);
-    expectSubscriptions(x.subscriptions).toBe(xsubs);
-    expectSubscriptions(y.subscriptions).toBe(ysubs);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 });

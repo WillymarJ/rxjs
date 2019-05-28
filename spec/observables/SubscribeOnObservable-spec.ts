@@ -1,13 +1,11 @@
 import { expect } from 'chai';
 import * as sinon from 'sinon';
-import * as Rx from '../../dist/package/Rx';
-import { SubscribeOnObservable } from '../../dist/package/observable/SubscribeOnObservable';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { SubscribeOnObservable } from 'rxjs/observable/SubscribeOnObservable';
+import { hot, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { TestScheduler } from 'rxjs/testing';
+import { asapScheduler } from 'rxjs';
 
-declare const hot: typeof marbleTestingSignature.hot;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-declare const rxTestScheduler: Rx.TestScheduler;
+declare const rxTestScheduler: TestScheduler;
 
 describe('SubscribeOnObservable', () => {
   it('should create Observable to be subscribed on specified scheduler', () => {
@@ -26,7 +24,7 @@ describe('SubscribeOnObservable', () => {
 
     const scheduler = (<any>new SubscribeOnObservable(e1, 0, obj)).scheduler;
 
-    expect(scheduler).to.deep.equal(Rx.Scheduler.asap);
+    expect(scheduler).to.deep.equal(asapScheduler);
   });
 
   it('should create observable via staic create function', () => {

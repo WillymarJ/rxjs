@@ -1,36 +1,9 @@
 import { expect } from 'chai';
-import * as sinon from 'sinon';
-import * as Rx from '../dist/package/Rx';
-
-const Subscriber = Rx.Subscriber;
+import { SafeSubscriber } from 'rxjs/internal/Subscriber';
+import { Subscriber } from 'rxjs';
 
 /** @test {Subscriber} */
 describe('Subscriber', () => {
-  describe('when created through create()', () => {
-    it('should not call error() if next() handler throws an error', () => {
-      const errorSpy = sinon.spy();
-      const completeSpy = sinon.spy();
-
-      const subscriber = Subscriber.create(
-        (value: any) => {
-          if (value === 2) {
-            throw 'error!';
-          }
-        },
-        errorSpy,
-        completeSpy
-      );
-
-      subscriber.next(1);
-      expect(() => {
-        subscriber.next(2);
-      }).to.throw('error!');
-
-      expect(errorSpy).not.have.been.called;
-      expect(completeSpy).not.have.been.called;
-    });
-  });
-
   it('should ignore next messages after unsubscription', () => {
     let times = 0;
 
@@ -44,6 +17,18 @@ describe('Subscriber', () => {
     sub.next();
 
     expect(times).to.equal(2);
+  });
+
+  it('should wrap unsafe observers in a safe subscriber', () => {
+    const observer = {
+      next(x: any) { /* noop */ },
+      error(err: any) { /* noop */ },
+      complete() { /* noop */ }
+    };
+
+    const subscriber = new Subscriber(observer);
+    expect((subscriber as any).destination).not.to.equal(observer);
+    expect((subscriber as any).destination).to.be.an.instanceof(SafeSubscriber);
   });
 
   it('should ignore error messages after unsubscription', () => {

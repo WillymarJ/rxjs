@@ -1,25 +1,25 @@
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { timestamp, map, mergeMap } from 'rxjs/operators';
+import { TestScheduler } from 'rxjs/testing';
+import { of } from 'rxjs';
+import { Timestamp } from 'rxjs/internal/operators/timestamp';
 
-declare const { asDiagram };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
+declare function asDiagram(arg: string): Function;
 
-declare const rxTestScheduler: Rx.TestScheduler;
-const Observable = Rx.Observable;
+declare const rxTestScheduler: TestScheduler;
 
 /** @test {timestamp} */
-describe('Observable.prototype.timestamp', () => {
+describe('timestamp operator', () => {
   asDiagram('timestamp')('should record the time stamp per each source elements', () => {
     const e1 =   hot('-b-c-----d--e--|');
     const e1subs =   '^              !';
     const expected = '-w-x-----y--z--|';
     const expectedValue = { w: 10, x: 30, y: 90, z: 120 };
 
-    const result = e1.timestamp(rxTestScheduler)
-      .map(x => x.timestamp);
+    const result = e1.pipe(
+      timestamp(rxTestScheduler),
+      map(x => x.timestamp)
+    );
 
     expectObservable(result).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -31,13 +31,13 @@ describe('Observable.prototype.timestamp', () => {
     const expected =    '-w--x----y---z--|';
 
     const expectedValue = {
-      w: new Rx.Timestamp('b', 10),
-      x: new Rx.Timestamp('c', 40),
-      y: new Rx.Timestamp('d', 90),
-      z: new Rx.Timestamp('e', 130)
+      w: new Timestamp('b', 10),
+      x: new Timestamp('c', 40),
+      y: new Timestamp('d', 90),
+      z: new Timestamp('e', 130)
     };
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected, expectedValue);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -46,7 +46,7 @@ describe('Observable.prototype.timestamp', () => {
     const e1subs =   '^        !';
     const expected = '---------|';
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -55,7 +55,7 @@ describe('Observable.prototype.timestamp', () => {
     const e1subs =   '(^!)';
     const expected = '|';
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -65,11 +65,11 @@ describe('Observable.prototype.timestamp', () => {
     const expected = '-y--z--';
 
     const expectedValue = {
-      y: new Rx.Timestamp('a', 10),
-      z: new Rx.Timestamp('b', 40)
+      y: new Timestamp('a', 10),
+      z: new Timestamp('b', 40)
     };
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected, expectedValue);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -80,11 +80,11 @@ describe('Observable.prototype.timestamp', () => {
     const expected = '-y--z---           ';
 
     const expectedValue = {
-      y: new Rx.Timestamp('a', 10),
-      z: new Rx.Timestamp('b', 40)
+      y: new Timestamp('a', 10),
+      z: new Timestamp('b', 40)
     };
 
-    const result = e1.timestamp(rxTestScheduler);
+    const result = e1.pipe(timestamp(rxTestScheduler));
 
     expectObservable(result, unsub).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -97,14 +97,15 @@ describe('Observable.prototype.timestamp', () => {
     const unsub =    '       !           ';
 
     const expectedValue = {
-      y: new Rx.Timestamp('a', 10),
-      z: new Rx.Timestamp('b', 40)
+      y: new Timestamp('a', 10),
+      z: new Timestamp('b', 40)
     };
 
-    const result = e1
-      .mergeMap(x => Observable.of(x))
-      .timestamp(rxTestScheduler)
-      .mergeMap(x => Observable.of(x));
+    const result = e1.pipe(
+      mergeMap(x => of(x)),
+      timestamp(rxTestScheduler),
+      mergeMap(x => of(x))
+    );
 
     expectObservable(result, unsub).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -115,7 +116,7 @@ describe('Observable.prototype.timestamp', () => {
     const e1subs =   '^';
     const expected = '-';
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -124,7 +125,7 @@ describe('Observable.prototype.timestamp', () => {
     const e1subs =   '^  !';
     const expected = '---#';
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -134,11 +135,11 @@ describe('Observable.prototype.timestamp', () => {
     const expected = '-y--z--#';
 
     const expectedValue = {
-      y: new Rx.Timestamp('a', 10),
-      z: new Rx.Timestamp('b', 40)
+      y: new Timestamp('a', 10),
+      z: new Timestamp('b', 40)
     };
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected, expectedValue);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected, expectedValue);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -147,7 +148,7 @@ describe('Observable.prototype.timestamp', () => {
     const e1subs =   '(^!)';
     const expected = '#';
 
-    expectObservable(e1.timestamp(rxTestScheduler)).toBe(expected);
+    expectObservable(e1.pipe(timestamp(rxTestScheduler))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 });

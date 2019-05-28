@@ -1,17 +1,13 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { reduce, mergeMap } from 'rxjs/operators';
+import { range, of, Observable } from 'rxjs';
 
-declare const { asDiagram, type };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+declare const type: Function;
+declare const asDiagram: Function;
 
 /** @test {reduce} */
-describe('Observable.prototype.reduce', () => {
+describe('reduce operator', () => {
   asDiagram('reduce((acc, curr) => acc + curr, 0)')('should reduce', () => {
     const values = {
       a: 1, b: 3, c: 5, x: 9
@@ -20,11 +16,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =     '^          !';
     const expected =   '-----------(x|)';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: number, x: number) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, 0)).toBe(expected, values);
+    expectObservable(e1.pipe(reduce(reduceFunction, 0))).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -34,11 +30,11 @@ describe('Observable.prototype.reduce', () => {
     const expected =   '--------(x|)';
 
     const seed = 'n';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, seed)).toBe(expected, {x: seed + 'ab'});
+    expectObservable(e1.pipe(reduce(reduceFunction, seed))).toBe(expected, {x: seed + 'ab'});
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -51,7 +47,7 @@ describe('Observable.prototype.reduce', () => {
       x: 'undefined b c d e f g'
     };
 
-    const source = e1.reduce((acc: any, x: string) => acc + ' ' + x, undefined);
+    const source = e1.pipe(reduce((acc: any, x: string) => acc + ' ' + x, undefined));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -66,7 +62,7 @@ describe('Observable.prototype.reduce', () => {
       x: 'b c d e f g'
     };
 
-    const source = e1.reduce((acc: any, x: string) => acc + ' ' + x);
+    const source = e1.pipe(reduce((acc: any, x: string) => acc + ' ' + x));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -75,10 +71,10 @@ describe('Observable.prototype.reduce', () => {
   it('should reduce with index without seed', (done: MochaDone) => {
     const idx = [1, 2, 3, 4, 5];
 
-    Observable.range(0, 6).reduce((acc, value, index) => {
+    range(0, 6).pipe(reduce((acc, value, index) => {
       expect(idx.shift()).to.equal(index);
       return value;
-    }).subscribe(null, null, () => {
+    })).subscribe(null, null, () => {
       expect(idx).to.be.empty;
       done();
     });
@@ -87,10 +83,10 @@ describe('Observable.prototype.reduce', () => {
   it('should reduce with index with seed', (done: MochaDone) => {
     const idx = [0, 1, 2, 3, 4, 5];
 
-    Observable.range(0, 6).reduce((acc, value, index) => {
+    range(0, 6).pipe(reduce((acc, value, index) => {
       expect(idx.shift()).to.equal(index);
       return value;
-    }, -1).subscribe(null, null, () => {
+    }, -1)).subscribe(null, null, () => {
       expect(idx).to.be.empty;
       done();
     });
@@ -102,11 +98,11 @@ describe('Observable.prototype.reduce', () => {
     const expected =    '--------(x|)';
 
     const expectedValue = '42';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, expectedValue)).toBe(expected, {x: expectedValue});
+    expectObservable(e1.pipe(reduce(reduceFunction, expectedValue))).toBe(expected, {x: expectedValue});
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -115,11 +111,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =     '^    !   ';
     const expected =   '-----#   ';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       throw 'error';
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -129,11 +125,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =     '^     !  ';
     const expected =   '-------  ';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    const result = e1.reduce(reduceFunction);
+    const result = e1.pipe(reduce(reduceFunction));
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -145,14 +141,15 @@ describe('Observable.prototype.reduce', () => {
     const expected =   '-------  ';
     const unsub =      '      !  ';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    const result = e1
-      .mergeMap((x: string) => Observable.of(x))
-      .reduce(reduceFunction)
-      .mergeMap((x: string) => Observable.of(x));
+    const result = e1.pipe(
+      mergeMap((x: string) => of(x)),
+      reduce(reduceFunction),
+      mergeMap((x: string) => of(x))
+    );
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -164,11 +161,11 @@ describe('Observable.prototype.reduce', () => {
     const expected = '--------#';
 
     const expectedValue = '42';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, expectedValue)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction, expectedValue))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -178,11 +175,11 @@ describe('Observable.prototype.reduce', () => {
     const expected = '----#';
 
     const expectedValue = '42';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, expectedValue)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction, expectedValue))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -192,11 +189,11 @@ describe('Observable.prototype.reduce', () => {
     const expected =   '--#     ';
 
     const seed = 'n';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       throw 'error';
     };
 
-    expectObservable(e1.reduce(reduceFunction, seed)).toBe(expected);
+    expectObservable(e1.pipe(reduce<string>(reduceFunction, seed))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -206,11 +203,11 @@ describe('Observable.prototype.reduce', () => {
     const expected =   '-----';
 
     const seed = 'n';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, seed)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction, seed))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -220,11 +217,11 @@ describe('Observable.prototype.reduce', () => {
     const expected = '-';
 
     const seed = 'n';
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction, seed)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction, seed))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -233,11 +230,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =   '^       ';
     const expected = '--------';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -246,11 +243,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =   '^';
     const expected = '-';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -259,11 +256,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =      '^       !';
     const expected =    '--------|';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -272,11 +269,11 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =   '^       !';
     const expected = '--------#';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -285,128 +282,112 @@ describe('Observable.prototype.reduce', () => {
     const e1subs =   '^   !';
     const expected = '----#';
 
-    const reduceFunction = function (o, x) {
+    const reduceFunction = function (o: string, x: string) {
       return o + x;
     };
 
-    expectObservable(e1.reduce(reduceFunction)).toBe(expected);
+    expectObservable(e1.pipe(reduce(reduceFunction))).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
-  it('should accept array typed reducers', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      a.reduce((acc, value) => acc.concat(value), []);
+  type('should accept array typed reducers', () => {
+    let a: Observable<{ a: number; b: string }>;
+    a.pipe(reduce((acc, value) => acc.concat(value), []));
+  });
+
+  type('should accept T typed reducers', () => {
+    let a: Observable<{ a: number; b: string }>;
+    const reduced = a.pipe(reduce((acc, value) => {
+      value.a = acc.a;
+      value.b = acc.b;
+      return acc;
+    }));
+
+    reduced.subscribe(r => {
+      r.a.toExponential();
+      r.b.toLowerCase();
     });
   });
 
-  it('should accept T typed reducers', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      const reduced = a.reduce((acc, value) => {
-        value.a = acc.a;
-        value.b = acc.b;
-        return acc;
-      });
+  type('should accept T typed reducers when T is an array', () => {
+    let a: Observable<number[]>;
+    const reduced = a.pipe(reduce((acc, value) => {
+      return acc.concat(value);
+    }, []));
 
-      reduced.subscribe(r => {
-        r.a.toExponential();
-        r.b.toLowerCase();
-      });
+    reduced.subscribe(rs => {
+      rs[0].toExponential();
     });
   });
 
-  it('should accept T typed reducers when T is an array', () => {
-    type(() => {
-      let a: Rx.Observable<number[]>;
-      const reduced = a.reduce((acc, value) => {
-        return acc.concat(value);
-      }, []);
+  type('should accept R typed reduces when R is an array of T', () => {
+    let a: Observable<number>;
+    const reduced = a.pipe(reduce((acc, value) => {
+      acc.push(value);
+      return acc;
+    }, []));
 
-      reduced.subscribe(rs => {
-        rs[0].toExponential();
-      });
+    reduced.subscribe(rs => {
+      rs[0].toExponential();
     });
   });
 
-  it('should accept R typed reduces when R is an array of T', () => {
-    type(() => {
-      let a: Rx.Observable<number>;
-      const reduced = a.reduce((acc, value) => {
-        acc.push(value);
-        return acc;
-      }, []);
+  type('should accept R typed reducers when R is assignable to T', () => {
+    let a: Observable<{ a?: number; b?: string }>;
+    const reduced = a.pipe(reduce((acc, value) => {
+      value.a = acc.a;
+      value.b = acc.b;
+      return acc;
+    }, {} as { a?: number; b?: string }));
 
-      reduced.subscribe(rs => {
-        rs[0].toExponential();
-      });
+    reduced.subscribe(r => {
+      r.a.toExponential();
+      r.b.toLowerCase();
     });
   });
 
-  it('should accept R typed reducers when R is assignable to T', () => {
-    type(() => {
-      let a: Rx.Observable<{ a?: number; b?: string }>;
-      const reduced = a.reduce((acc, value) => {
-        value.a = acc.a;
-        value.b = acc.b;
-        return acc;
-      }, {});
+  type('should accept R typed reducers when R is not assignable to T', () => {
+    let a: Observable<{ a: number; b: string }>;
+    const seed = {
+      as: [1],
+      bs: ['a']
+    };
+    const reduced = a.pipe(reduce((acc, value: {a: number, b: string}) => {
+      acc.as.push(value.a);
+      acc.bs.push(value.b);
+      return acc;
+    }, seed));
 
-      reduced.subscribe(r => {
-        r.a.toExponential();
-        r.b.toLowerCase();
-      });
+    reduced.subscribe(r => {
+      r.as[0].toExponential();
+      r.bs[0].toLowerCase();
     });
   });
 
-  it('should accept R typed reducers when R is not assignable to T', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      const seed = {
-        as: [1],
-        bs: ['a']
-      };
-      const reduced = a.reduce((acc, value) => {
-        acc.as.push(value.a);
-        acc.bs.push(value.b);
-        return acc;
-      }, seed);
+  type('should accept R typed reducers and reduce to type R', () => {
+    let a: Observable<{ a: number; b: string }>;
+    const reduced = a.pipe(reduce<{ a?: number; b?: string }>((acc, value) => {
+      value.a = acc.a;
+      value.b = acc.b;
+      return acc;
+    }, {}));
 
-      reduced.subscribe(r => {
-        r.as[0].toExponential();
-        r.bs[0].toLowerCase();
-      });
+    reduced.subscribe(r => {
+      r.a.toExponential();
+      r.b.toLowerCase();
     });
   });
 
-  it('should accept R typed reducers and reduce to type R', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      const reduced = a.reduce<{ a?: number; b?: string }>((acc, value) => {
-        value.a = acc.a;
-        value.b = acc.b;
-        return acc;
-      }, {});
+  type('should accept array of R typed reducers and reduce to array of R', () => {
+    let a: Observable<number>;
+    const reduced = a.pipe(reduce<number, string[]>((acc, cur) => {
+      console.log(acc);
+      acc.push(cur.toString());
+      return acc;
+    }, [] as string[]));
 
-      reduced.subscribe(r => {
-        r.a.toExponential();
-        r.b.toLowerCase();
-      });
-    });
-  });
-
-  it('should accept array of R typed reducers and reduce to array of R', () => {
-    type(() => {
-      let a: Rx.Observable<number>;
-      const reduced = a.reduce((acc, cur) => {
-        console.log(acc);
-        acc.push(cur.toString());
-        return acc;
-      }, [] as string[]);
-
-      reduced.subscribe(rs => {
-        rs[0].toLowerCase();
-      });
+    reduced.subscribe(rs => {
+      rs[0].toLowerCase();
     });
   });
 });

@@ -1,17 +1,13 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { scan, mergeMap, finalize, reduce } from 'rxjs/operators';
+import { of, Observable } from 'rxjs';
 
-declare const { asDiagram, type };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+declare const type: Function;
+declare const asDiagram: Function;
 
 /** @test {scan} */
-describe('Observable.prototype.scan', () => {
+describe('scan operator', () => {
   asDiagram('scan((acc, curr) => acc + curr, 0)')('should scan', () => {
     const values = {
       a: 1, b: 3, c: 5,
@@ -21,11 +17,11 @@ describe('Observable.prototype.scan', () => {
     const e1subs =     '^          !';
     const expected =   '--x--y--z--|';
 
-    const scanFunction = function (o, x) {
+    const scanFunction = function (o: number, x: number) {
       return o + x;
     };
 
-    expectObservable(e1.scan(scanFunction, 0)).toBe(expected, values);
+    expectObservable(e1.pipe(scan(scanFunction, 0))).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
@@ -43,7 +39,7 @@ describe('Observable.prototype.scan', () => {
       z: ['b', 'c', 'd', 'e', 'f', 'g']
     };
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -63,7 +59,7 @@ describe('Observable.prototype.scan', () => {
       z: 'undefined b c d e f g'
     };
 
-    const source = e1.scan((acc: any, x: string) => acc + ' ' + x, undefined);
+    const source = e1.pipe(scan((acc: any, x: string) => acc + ' ' + x, undefined));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -80,7 +76,7 @@ describe('Observable.prototype.scan', () => {
       z: 'bcd'
     };
 
-    const source = e1.scan((acc: any, x: string) => acc + x);
+    const source = e1.pipe(scan((acc: any, x: string) => acc + x));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -97,7 +93,7 @@ describe('Observable.prototype.scan', () => {
       w: ['b', 'c', 'd']
     };
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -117,12 +113,12 @@ describe('Observable.prototype.scan', () => {
       z: ['b', 'c', 'd', 'e', 'f', 'g']
     };
 
-    const source = e1.scan((acc: any, x: string) => {
+    const source = e1.pipe(scan((acc: any, x: string) => {
       if (x === 'd') {
         throw 'bad!';
       }
       return [].concat(acc, x);
-    }, []);
+    }, []));
 
     expectObservable(source).toBe(expected, values, 'bad!');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -133,7 +129,7 @@ describe('Observable.prototype.scan', () => {
     const e1subs =   '(^!)';
     const expected = '|';
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -144,7 +140,7 @@ describe('Observable.prototype.scan', () => {
     const e1subs =   '^';
     const expected = '-';
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -155,7 +151,7 @@ describe('Observable.prototype.scan', () => {
     const e1subs =   '(^!)';
     const expected = '#';
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -175,7 +171,7 @@ describe('Observable.prototype.scan', () => {
       z: ['b', 'c', 'd', 'e', 'f', 'g']
     };
 
-    const source = e1.scan((acc: any, x: string) => [].concat(acc, x), []);
+    const source = e1.pipe(scan((acc: any, x: string) => [].concat(acc, x), []));
 
     expectObservable(source, unsub).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -195,10 +191,11 @@ describe('Observable.prototype.scan', () => {
       z: ['b', 'c', 'd', 'e', 'f', 'g']
     };
 
-    const source = e1
-      .mergeMap((x: string) => Observable.of(x))
-      .scan((acc: any, x: string) => [].concat(acc, x), [])
-      .mergeMap((x: string) => Observable.of(x));
+    const source = e1.pipe(
+      mergeMap((x: string) => of(x)),
+      scan((acc: any, x: string) => [].concat(acc, x), []),
+      mergeMap((x: string[]) => of(x))
+    );
 
     expectObservable(source, unsub).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -220,40 +217,37 @@ describe('Observable.prototype.scan', () => {
       return o + value;
     };
 
-    const scan = e1.scan(scanFunction, 0).finally(() => {
-      expect(idx).to.be.empty;
-    });
+    const scanObs = e1.pipe(
+      scan(scanFunction, 0),
+      finalize(() => {
+        expect(idx).to.be.empty;
+      })
+    );
 
-    expectObservable(scan).toBe(expected, values);
+    expectObservable(scanObs).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
   });
 
-  it('should accept array types', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      a.scan((acc, value) => acc.concat(value), []);
-    });
+  type('should accept array typed reducers', () => {
+    let a: Observable<{ a: number; b: string }>;
+    a.pipe(scan((acc, value) => acc.concat(value), []));
   });
 
-  it('should accept T types', () => {
-    type(() => {
-      let a: Rx.Observable<{ a?: number; b?: string }>;
-      a.scan((acc, value) => {
-        acc.a = value.a;
-        acc.b = value.b;
-        return acc;
-      }, {});
-    });
+  type('should accept T typed reducers', () => {
+    let a: Observable<{ a?: number; b?: string }>;
+    a.pipe(scan((acc, value) => {
+      value.a = acc.a;
+      value.b = acc.b;
+      return acc;
+    }, {} as { a?: number; b?: string }));
   });
 
-  it('should accept R typed reducers', () => {
-    type(() => {
-      let a: Rx.Observable<{ a: number; b: string }>;
-      a.scan<{ a?: number; b?: string }>((acc, value) => {
-        acc.a = value.a;
-        acc.b = value.b;
-        return acc;
-      }, {});
-    });
+  type('should accept R typed reducers', () => {
+    let a: Observable<{ a: number; b: string }>;
+    a.pipe(scan<{ a?: number; b?: string }>((acc, value) => {
+      value.a = acc.a;
+      value.b = acc.b;
+      return acc;
+    }, {}));
   });
 });

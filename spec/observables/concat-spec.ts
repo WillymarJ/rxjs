@@ -1,18 +1,13 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
 import { lowerCaseO } from '../helpers/test-helper';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, emptySubs, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { asyncScheduler, queueScheduler as rxQueueScheduler, concat, of, defer, Observable } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
 
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
-const queueScheduler = Rx.Scheduler.queue;
+const queueScheduler = rxQueueScheduler;
 
 /** @test {concat} */
-describe('Observable.concat', () => {
+describe('static concat', () => {
   it('should emit elements from multiple sources', () => {
     const e1 =  cold('-a-b-c-|');
     const e1subs =   '^      !';
@@ -22,7 +17,7 @@ describe('Observable.concat', () => {
     const e3subs =   '            ^        !';
     const expected = '-a-b-c--0-1--w-x-y-z-|';
 
-    expectObservable(Observable.concat(e1, e2, e3)).toBe(expected);
+    expectObservable(concat(e1, e2, e3)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
     expectSubscriptions(e3.subscriptions).toBe(e3subs);
@@ -36,7 +31,7 @@ describe('Observable.concat', () => {
                       '                              ^         !'];
     const expected =    '--i-j-k-l---i-j-k-l---i-j-k-l---i-j-k-l-|';
 
-    const result = Observable.concat(inner, inner, inner, inner);
+    const result = concat(inner, inner, inner, inner);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(inner.subscriptions).toBe(innersubs);
@@ -50,7 +45,7 @@ describe('Observable.concat', () => {
                       '          ^    !'];
     const expected =    '--i-j-k-l---i-j-';
 
-    const result = Observable.concat(inner, inner, inner, inner);
+    const result = concat(inner, inner, inner, inner);
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(inner.subscriptions).toBe(innersubs);
@@ -63,10 +58,11 @@ describe('Observable.concat', () => {
     const expected =    '--i-j-k-l---i-j-';
     const unsub =       '               !';
 
-    const innerWrapped = inner.mergeMap((x: string) => Observable.of(x));
-    const result = Observable
-      .concat(innerWrapped, innerWrapped, innerWrapped, innerWrapped)
-      .mergeMap((x: any) => Observable.of(x));
+    const innerWrapped = inner.pipe(
+      mergeMap((x) => of(x))
+    );
+    const result = concat(innerWrapped, innerWrapped, innerWrapped, innerWrapped)
+      .pipe(mergeMap((x) => of(x)));
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(inner.subscriptions).toBe(innersubs);
@@ -79,7 +75,7 @@ describe('Observable.concat', () => {
     const e2subs =    '  ^   !';
     const expected =  '------|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -88,10 +84,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('-');
     const e1subs =    '^';
     const e2 =   cold('--|');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '-';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -103,7 +99,7 @@ describe('Observable.concat', () => {
     const e2subs =    '  ^';
     const expected =  '---';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -112,10 +108,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('-');
     const e1subs =    '^';
     const e2 =   cold('-');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '-';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -127,7 +123,7 @@ describe('Observable.concat', () => {
     const e2subs =    '  ^   !';
     const expected =  '------#';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -136,10 +132,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('---#');
     const e1subs =    '^  !';
     const e2 =   cold('----|');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '---#';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -148,10 +144,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('---#');
     const e1subs =    '^  !';
     const e2 =   cold('------#');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '---#';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -163,7 +159,7 @@ describe('Observable.concat', () => {
     const e2subs =    '     ^       !';
     const expected =  '--a----------|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -175,7 +171,7 @@ describe('Observable.concat', () => {
     const e2subs =    '  ^    !';
     const expected =  '----a--|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -188,7 +184,7 @@ describe('Observable.concat', () => {
     const e2subs =    '     ^';
     const expected =  '--a---';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -197,10 +193,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('-');
     const e1subs =    '^';
     const e2 =   cold('--a--|');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '-';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -212,7 +208,7 @@ describe('Observable.concat', () => {
     const e2subs =    '    ^       !';
     const expected =  '---a-----b--|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -225,7 +221,7 @@ describe('Observable.concat', () => {
     const unsub =     '                 !    ';
     const expected =  '---a-a--a-----b-b     ';
 
-    expectObservable(Observable.concat(e1, e2), unsub).toBe(expected);
+    expectObservable(concat(e1, e2), unsub).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -234,10 +230,10 @@ describe('Observable.concat', () => {
     const e1 =   cold('--#');
     const e1subs =    '^ !';
     const e2 =   cold('----a--|');
-    const e2subs = [];
+    const e2subs = emptySubs;
     const expected =  '--#';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -249,7 +245,7 @@ describe('Observable.concat', () => {
     const e2subs =    '     ^      !';
     const expected =  '--a---------#';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -262,7 +258,7 @@ describe('Observable.concat', () => {
     const e2subs =   '       ^      !';
     const expected = '--a--b--x--y--|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -275,7 +271,7 @@ describe('Observable.concat', () => {
     const e2subs =   '            ^      !';
     const expected = '--a--b--c----x-y-z-|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -287,7 +283,7 @@ describe('Observable.concat', () => {
     const e2subs =   '           ^     !';
     const expected = '--a--b--c--y--z--|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -297,7 +293,7 @@ describe('Observable.concat', () => {
     const e1subs =  ['(^!)', '(^!)'];
     const expected = '|';
 
-    const result = Observable.concat(e1, e1);
+    const result = concat(e1, e1);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -308,7 +304,7 @@ describe('Observable.concat', () => {
     const e1subs =   '(^!)';
     const expected = '#';
 
-    const result = Observable.concat(e1, e1);
+    const result = concat(e1, e1);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -322,7 +318,7 @@ describe('Observable.concat', () => {
     const e2subs =   '            ^      !';
     const expected = '--a--b--c----x-y-z-|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
@@ -334,30 +330,29 @@ describe('Observable.concat', () => {
     const e2subs =   '           ^     !';
     const expected = '--a--b--c--y--z--|';
 
-    expectObservable(Observable.concat(e1, e2)).toBe(expected);
+    expectObservable(concat(e1, e2)).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
     expectSubscriptions(e2.subscriptions).toBe(e2subs);
   });
 
-  it('should concat an immediately-scheduled source with an immediately-scheduled second', (done: MochaDone) => {
-    const a = Observable.of<number>(1, 2, 3, queueScheduler);
-    const b = Observable.of<number>(4, 5, 6, 7, 8, queueScheduler);
+  it('should concat an immediately-scheduled source with an immediately-scheduled second', (done) => {
+    const a = of<number>(1, 2, 3, queueScheduler);
+    const b = of<number>(4, 5, 6, 7, 8, queueScheduler);
     const r = [1, 2, 3, 4, 5, 6, 7, 8];
 
-    Observable.concat(a, b, queueScheduler).subscribe((vals: number) => {
+    concat(a, b, queueScheduler).subscribe((vals) => {
       expect(vals).to.equal(r.shift());
     }, null, done);
   });
 
-  it('should use the scheduler even when one Observable is concat\'d', (done: MochaDone) => {
+  it('should use the scheduler even when one Observable is concat\'d', (done) => {
     let e1Subscribed = false;
-    const e1 = Observable.defer(() => {
+    const e1 = defer(() => {
       e1Subscribed = true;
-      return Observable.of('a');
+      return of('a');
     });
 
-    Observable
-      .concat(e1, Rx.Scheduler.async)
+    concat(e1, asyncScheduler)
       .subscribe({
         error: done,
         complete: () => {
@@ -371,15 +366,14 @@ describe('Observable.concat', () => {
 
   it('should return passed observable if no scheduler was passed', () => {
     const source = cold('--a---b----c---|');
-    const result = Observable.concat(source);
+    const result = concat(source);
 
-    expect(result).to.equal(source);
     expectObservable(result).toBe('--a---b----c---|');
   });
 
   it('should return RxJS Observable when single lowerCaseO was passed', () => {
     const source = lowerCaseO('a', 'b', 'c');
-    const result = Observable.concat(source);
+    const result = concat(source);
 
     expect(result).to.be.an.instanceof(Observable);
     expectObservable(result).toBe('(abc|)');

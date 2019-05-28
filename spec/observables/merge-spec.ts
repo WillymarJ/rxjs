@@ -1,18 +1,14 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
 import { lowerCaseO } from '../helpers/test-helper';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { TestScheduler } from 'rxjs/testing';
+import { merge, of, Observable, defer, asyncScheduler } from 'rxjs';
+import { delay } from 'rxjs/operators';
 
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-declare const rxTestScheduler: Rx.TestScheduler;
-const Observable = Rx.Observable;
+declare const rxTestScheduler: TestScheduler;
 
 /** @test {merge} */
-describe('Observable.merge(...observables)', () => {
+describe('static merge(...observables)', () => {
   it('should merge cold and cold', () => {
     const e1 =  cold('---a-----b-----c----|');
     const e1subs =   '^                   !';
@@ -20,7 +16,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =   '^                      !';
     const expected = '---a--x--b--y--c--z----|';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -28,8 +24,8 @@ describe('Observable.merge(...observables)', () => {
   });
 
   it('should return itself when try to merge single observable', () => {
-    const e1 = Observable.of('a');
-    const result = Observable.merge(e1);
+    const e1 = of('a');
+    const result = merge(e1);
 
     expect(e1).to.equal(result);
   });
@@ -41,7 +37,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =         '^               !';
     const expected =       '--b--y--c--z----|';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -55,7 +51,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =       '^                  !';
     const expected =     '--x-b---y-c---z----|';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -69,7 +65,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =   '^                 !';
     const expected = '---(ax)-(by)-(cz)-|';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -82,7 +78,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('|');
     const e2subs = '(^!)';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('|');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -97,7 +93,7 @@ describe('Observable.merge(...observables)', () => {
     const e3 = cold('|');
     const e3subs = '(^!)';
 
-    const result = Observable.merge(e1, e2, e3);
+    const result = merge(e1, e2, e3);
 
     expectObservable(result).toBe('|');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -111,7 +107,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('|');
     const e2subs =  '(^!)';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('-');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -124,7 +120,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('-');
     const e2subs =  '^';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('-');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -137,7 +133,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('#');
     const e2subs =  '(^!)';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('#');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -150,7 +146,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('#');
     const e2subs =  '(^!)';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('#');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -163,7 +159,7 @@ describe('Observable.merge(...observables)', () => {
     const e2 = cold('#');
     const e2subs =  '(^!)';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe('#');
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -177,7 +173,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =    '^------!';
     const expected =  '-------#';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -191,7 +187,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =   '^      !    ';
     const expected = '--a--b-#    ';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -205,7 +201,7 @@ describe('Observable.merge(...observables)', () => {
     const e2subs =    '^      !';
     const expected =  '-------#';
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -215,7 +211,7 @@ describe('Observable.merge(...observables)', () => {
   it('should merge single lowerCaseO into RxJS Observable', () => {
     const e1 = lowerCaseO('a', 'b', 'c');
 
-    const result = Observable.merge(e1);
+    const result = merge(e1);
 
     expect(result).to.be.instanceof(Observable);
     expectObservable(result).toBe('(abc|)');
@@ -225,39 +221,39 @@ describe('Observable.merge(...observables)', () => {
     const e1 = lowerCaseO('a', 'b', 'c');
     const e2 = lowerCaseO('d', 'e', 'f');
 
-    const result = Observable.merge(e1, e2);
+    const result = merge(e1, e2);
 
     expect(result).to.be.instanceof(Observable);
     expectObservable(result).toBe('(abcdef|)');
   });
 });
 
-describe('Observable.merge(...observables, Scheduler)', () => {
+describe('merge(...observables, Scheduler)', () => {
   it('should merge single lowerCaseO into RxJS Observable', () => {
     const e1 = lowerCaseO('a', 'b', 'c');
 
-    const result = Observable.merge(e1, rxTestScheduler);
+    const result = merge(e1, rxTestScheduler);
 
     expect(result).to.be.instanceof(Observable);
     expectObservable(result).toBe('(abc|)');
   });
 });
 
-describe('Observable.merge(...observables, Scheduler, number)', () => {
+describe('merge(...observables, Scheduler, number)', () => {
   it('should handle concurrency limits', () => {
     const e1 =  cold('---a---b---c---|');
     const e2 =  cold('-d---e---f--|');
     const e3 =  cold(            '---x---y---z---|');
     const expected = '-d-a-e-b-f-c---x---y---z---|';
-    expectObservable(Observable.merge(e1, e2, e3, 2)).toBe(expected);
+    expectObservable(merge(e1, e2, e3, 2)).toBe(expected);
   });
 
   it('should handle scheduler', () => {
-    const e1 =  Observable.of('a');
-    const e2 =  Observable.of('b').delay(20, rxTestScheduler);
+    const e1 =  of('a');
+    const e2 =  of('b').pipe(delay(20, rxTestScheduler));
     const expected = 'a-(b|)';
 
-    expectObservable(Observable.merge(e1, e2, rxTestScheduler)).toBe(expected);
+    expectObservable(merge(e1, e2, rxTestScheduler)).toBe(expected);
   });
 
   it('should handle scheduler with concurrency limits', () => {
@@ -265,18 +261,17 @@ describe('Observable.merge(...observables, Scheduler, number)', () => {
     const e2 =  cold('-d---e---f--|');
     const e3 =  cold(            '---x---y---z---|');
     const expected = '-d-a-e-b-f-c---x---y---z---|';
-    expectObservable(Observable.merge(e1, e2, e3, 2, rxTestScheduler)).toBe(expected);
+    expectObservable(merge(e1, e2, e3, 2, rxTestScheduler)).toBe(expected);
   });
 
-  it('should use the scheduler even when one Observable is merged', (done: MochaDone) => {
+  it('should use the scheduler even when one Observable is merged', (done) => {
     let e1Subscribed = false;
-    const e1 = Observable.defer(() => {
+    const e1 = defer(() => {
       e1Subscribed = true;
-      return Observable.of('a');
+      return of('a');
     });
 
-    Observable
-      .merge(e1, Rx.Scheduler.async)
+    merge(e1, asyncScheduler)
       .subscribe({
         error: done,
         complete: () => {

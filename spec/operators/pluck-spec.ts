@@ -1,16 +1,12 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { pluck, map, tap, mergeMap } from 'rxjs/operators';
+import { of } from 'rxjs';
 
-declare const { asDiagram };
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+declare function asDiagram(arg: string): Function;
 
 /** @test {pluck} */
-describe('Observable.prototype.pluck', () => {
+describe('pluck operator', () => {
   asDiagram('pluck(\'v\')')('should dematerialize an Observable', () => {
     const values = {
       a: '{v:1}',
@@ -21,7 +17,10 @@ describe('Observable.prototype.pluck', () => {
     const e1 =  cold('--a--b--c--|', values);
     const expected = '--x--y--z--|';
 
-    const result = e1.map((x: string) => ({v: x.charAt(3)})).pluck('v');
+    const result = e1.pipe(
+      map((x: string) => ({v: x.charAt(3)})),
+      pluck('v')
+    );
 
     expectObservable(result).toBe(expected, {x: '1', y: '2', z: '3'});
   });
@@ -31,7 +30,7 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^    !';
     const expected = '--y--|';
 
-    const r = a.pluck('prop');
+    const r = a.pipe(pluck('prop'));
     expectObservable(r).toBe(expected, {y: 42});
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -48,7 +47,7 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^              !';
     const expected = '--1-2--3-4---5-|';
 
-    const r = a.pluck('prop');
+    const r = a.pipe(pluck('prop'));
     expectObservable(r).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -65,7 +64,7 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^              !';
     const expected = '--1-2--3-4---5-|';
 
-    const r = a.pluck('a', 'b', 'c');
+    const r = a.pipe(pluck('a', 'b', 'c'));
     expectObservable(r).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -81,16 +80,18 @@ describe('Observable.prototype.pluck', () => {
     const a =   cold('--a-b--c-d---e-|', inputs);
     const asubs =    '^              !';
     const expected = '--r-x--y-z---w-|';
-    const values = {r: 1, x: undefined, y: undefined, z: undefined, w: 5};
+    const values: { [key: string]: number | undefined } = {r: 1, x: undefined, y: undefined, z: undefined, w: 5};
 
-    const r = a.pluck('a', 'b', 'c');
+    // @ts-ignore
+    const r = a.pipe(pluck('a', 'b', 'c'));
     expectObservable(r).toBe(expected, values);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
 
   it('should throw an error if not property is passed', () => {
     expect(() => {
-      Observable.of({prop: 1}, {prop: 2}).pluck();
+      // @ts-ignore
+      of({prop: 1}, {prop: 2}).pipe(pluck());
     }).to.throw(Error, 'list of properties cannot be empty.');
   });
 
@@ -99,7 +100,8 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '(^!)';
     const expected = '#';
 
-    const r = a.pluck('whatever');
+    // @ts-ignore
+    const r = a.pipe(pluck('whatever'));
     expectObservable(r).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -109,7 +111,7 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^       !';
     const expected = '--1--2--#';
 
-    const r = a.pluck('prop');
+    const r = a.pipe(pluck('prop'));
     expectObservable(r).toBe(expected, undefined, 'too bad');
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -120,11 +122,13 @@ describe('Observable.prototype.pluck', () => {
     const expected = '|';
 
     const invoked = 0;
-    const r = a
-      .pluck('whatever')
-      .do(null, null, () => {
+    const r = a.pipe(
+      // @ts-ignore
+      pluck('whatever'),
+      tap(null, null, () => {
         expect(invoked).to.equal(0);
-      });
+      })
+    );
 
     expectObservable(r).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
@@ -136,7 +140,7 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^     !     ';
     const expected = '--1--2-     ';
 
-    const r = a.pluck('prop');
+    const r = a.pipe(pluck('prop'));
     expectObservable(r, unsub).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -153,7 +157,10 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^              !';
     const expected = '--1-2--3-4---5-|';
 
-    const r = a.pluck('a', 'b').pluck('c');
+    const r = a.pipe(
+      pluck('a', 'b'),
+      pluck('c')
+    );
     expectObservable(r).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);
   });
@@ -164,10 +171,11 @@ describe('Observable.prototype.pluck', () => {
     const asubs =    '^     !     ';
     const expected = '--1--2-     ';
 
-    const r = a
-      .mergeMap((x: string) => Observable.of(x))
-      .pluck('prop')
-      .mergeMap((x: string) => Observable.of(x));
+    const r = a.pipe(
+      mergeMap((x: { prop: string }) => of(x)),
+      pluck('prop'),
+      mergeMap((x: string) => of(x))
+    );
 
     expectObservable(r, unsub).toBe(expected);
     expectSubscriptions(a.subscriptions).toBe(asubs);

@@ -1,21 +1,15 @@
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
-
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { race, of } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
 
 /** @test {race} */
-describe('Observable.race', () => {
+describe('static race', () => {
   it('should race a single observable', () => {
     const e1 =  cold('---a-----b-----c----|');
     const e1subs =   '^                   !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race(e1);
+    const result = race(e1);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -28,7 +22,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -42,7 +36,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race([e1, e2]);
+    const result = race([e1, e2]);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -56,7 +50,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -70,7 +64,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -84,7 +78,7 @@ describe('Observable.race', () => {
     const e2subs =   '^                   !';
     const expected = '---a-----b-----c----|';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -98,7 +92,7 @@ describe('Observable.race', () => {
     const e2subs =   '^    !';
     const expected = '-----|';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -113,7 +107,7 @@ describe('Observable.race', () => {
     const expected = '---a-----b---';
     const unsub =    '            !';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -128,10 +122,10 @@ describe('Observable.race', () => {
     const expected =      '---b--c---    ';
     const unsub =         '         !    ';
 
-    const result = Observable.race(
-        e1.mergeMap((x: string) => Observable.of(x)),
-        e2.mergeMap((x: string) => Observable.of(x))
-    ).mergeMap((x: any) => Observable.of(x));
+    const result = race(
+        e1.pipe(mergeMap((x: string) => of(x))),
+        e2.pipe(mergeMap((x: string) => of(x)))
+    ).pipe(mergeMap((x: any) => of(x)));
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -144,7 +138,7 @@ describe('Observable.race', () => {
     const e1subs =   '^  !';
     const expected = '---|';
 
-    const source = Observable.race(e1, e2);
+    const source = race(e1, e2);
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -157,7 +151,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---a-----#';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -171,7 +165,7 @@ describe('Observable.race', () => {
     const e2subs =   '^  !';
     const expected = '---#';
 
-    const result = Observable.race(e1, e2);
+    const result = race(e1, e2);
 
     expectObservable(result).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -183,7 +177,7 @@ describe('Observable.race', () => {
     const e1subs =   '(^!)';
     const expected = '|';
 
-    const source = Observable.race(e1);
+    const source = race(e1);
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -194,7 +188,7 @@ describe('Observable.race', () => {
     const e1subs =   '^';
     const expected = '-';
 
-    const source = Observable.race(e1);
+    const source = race(e1);
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -205,7 +199,7 @@ describe('Observable.race', () => {
     const e1subs =   '(^!)';
     const expected = '#';
 
-    const source = Observable.race(e1);
+    const source = race(e1);
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);

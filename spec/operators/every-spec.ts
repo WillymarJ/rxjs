@@ -1,23 +1,18 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { every, mergeMap } from 'rxjs/operators';
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
+import { of, Observable, Observer } from 'rxjs';
 
-declare const { asDiagram };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
-
-const Observable = Rx.Observable;
+declare function asDiagram(arg: string): Function;
 
 /** @test {every} */
-describe('Observable.prototype.every', () => {
-  function truePredicate(x) {
+describe('every operator', () => {
+  function truePredicate(x: number | string) {
     return true;
   }
 
-  function predicate(x) {
-    return x % 5 === 0;
+  function predicate(x: number | string) {
+    return (+x) % 5 === 0;
   }
 
   asDiagram('every(x => x % 5 === 0)')('should return false if only some of element matches with predicate', () => {
@@ -25,39 +20,40 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^          !      ';
     const expected =   '-----------(F|)   ';
 
-    expectObservable(source.every(predicate)).toBe(expected, {F: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {F: false});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
   it('should accept thisArg with scalar observables', () => {
     const thisArg = {};
 
-    Observable.of(1).every(function (value: number, index: number) {
+    of(1).pipe(every(function (this: any, value: number, index: number) {
       expect(this).to.deep.equal(thisArg);
       return true;
-    }, thisArg).subscribe();
+    }, thisArg)).subscribe();
 
   });
 
   it('should accept thisArg with array observables', () => {
     const thisArg = {};
 
-    Observable.of(1, 2, 3, 4).every(function (value: number, index: number) {
+    of(1, 2, 3, 4).pipe(every(function (this: any, value: number, index: number) {
       expect(this).to.deep.equal(thisArg);
       return true;
-    }, thisArg).subscribe();
+    }, thisArg)).subscribe();
   });
 
   it('should accept thisArg with ordinary observables', () => {
     const thisArg = {};
 
-    Observable.create((observer: Rx.Observer<number>) => {
+    Observable.create((observer: Observer<number>) => {
       observer.next(1);
       observer.complete();
     })
-    .every(function (value: number, index: number) {
+    .pipe(every(function (this: any, value: number, index: number) {
       expect(this).to.deep.equal(thisArg);
-    }, thisArg).subscribe();
+      return true;
+    }, thisArg)).subscribe();
   });
 
   it('should emit true if source is empty', () => {
@@ -65,7 +61,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^    !';
     const expected =   '-----(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: true});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -74,7 +70,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^ !';
     const expected =   '--(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: false});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -83,7 +79,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^ !';
     const expected =   '--(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: false});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -92,7 +88,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^          !';
     const expected =   '-----------(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: false});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -102,7 +98,7 @@ describe('Observable.prototype.every', () => {
     const expected =   '--------          ';
     const unsub =      '       !          ';
 
-    const result = source.every(predicate);
+    const result = source.pipe(every(predicate));
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
@@ -114,10 +110,11 @@ describe('Observable.prototype.every', () => {
     const expected =   '--------          ';
     const unsub =      '       !          ';
 
-    const result = source
-      .mergeMap((x: any) => Observable.of(x))
-      .every(predicate)
-      .mergeMap((x: any) => Observable.of(x));
+    const result = source.pipe(
+      mergeMap((x: any) => of(x)),
+      every(predicate),
+      mergeMap((x: any) => of(x))
+    );
 
     expectObservable(result, unsub).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
@@ -128,7 +125,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^       !';
     const expected =   '--------#';
 
-    function faultyPredicate(x) {
+    function faultyPredicate(x: string) {
       if (x === 'c') {
         throw 'error';
       } else {
@@ -136,7 +133,7 @@ describe('Observable.prototype.every', () => {
       }
     }
 
-    expectObservable(source.every(faultyPredicate)).toBe(expected);
+    expectObservable(source.pipe(every(faultyPredicate))).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -145,61 +142,61 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^    !';
     const expected =   '-----(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: true});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
   it('should emit true if Scalar source matches with predicate', () => {
-    const source = Observable.of(5);
+    const source = of(5);
     const expected = '(T|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {T: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {T: true});
   });
 
   it('should emit false if Scalar source does not match with predicate', () => {
-    const source = Observable.of(3);
+    const source = of(3);
     const expected = '(F|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {F: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {F: false});
   });
 
   it('should propagate error if predicate throws on Scalar source', () => {
-    const source = Observable.of(3);
+    const source = of(3);
     const expected = '#';
 
-    function faultyPredicate(x) {
+    function faultyPredicate(x: number) {
       throw 'error';
     }
 
-    expectObservable(source.every(<any>faultyPredicate)).toBe(expected);
+    expectObservable(source.pipe(every(<any>faultyPredicate))).toBe(expected);
   });
 
   it('should emit true if Array source matches with predicate', () => {
-    const source = Observable.of(5, 10, 15, 20);
+    const source = of(5, 10, 15, 20);
     const expected = '(T|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {T: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {T: true});
   });
 
   it('should emit false if Array source does not match with predicate', () => {
-    const source = Observable.of(5, 9, 15, 20);
+    const source = of(5, 9, 15, 20);
     const expected = '(F|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {F: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {F: false});
   });
 
   it('should propagate error if predicate eventually throws on Array source', () => {
-    const source = Observable.of(5, 10, 15, 20);
+    const source = of(5, 10, 15, 20);
     const expected = '#';
 
-    function faultyPredicate(x) {
+    function faultyPredicate(x: number) {
       if (x === 15) {
         throw 'error';
       }
       return true;
     }
 
-    expectObservable(source.every(faultyPredicate)).toBe(expected);
+    expectObservable(source.pipe(every(faultyPredicate))).toBe(expected);
   });
 
   it('should emit true if all source element matches with predicate', () => {
@@ -207,7 +204,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^                !';
     const expected =   '-----------------(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: true});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -216,7 +213,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs = '^ !';
     const expected =   '--#';
 
-    expectObservable(source.every(truePredicate)).toBe(expected);
+    expectObservable(source.pipe(every(truePredicate))).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -225,7 +222,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs =  '^';
     const expected =    '-';
 
-    expectObservable(source.every(truePredicate)).toBe(expected);
+    expectObservable(source.pipe(every(truePredicate))).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -234,7 +231,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs =      '^                 !';
     const expected =        '------------------(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: true});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -243,7 +240,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs =      '^        !';
     const expected =        '---------(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: false});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: false});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -252,7 +249,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs =      '^  !';
     const expected =        '---#';
 
-    expectObservable(source.every(truePredicate)).toBe(expected);
+    expectObservable(source.pipe(every(truePredicate))).toBe(expected);
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 
@@ -261,7 +258,7 @@ describe('Observable.prototype.every', () => {
     const sourceSubs =      '^     !';
     const expected =        '------(x|)';
 
-    expectObservable(source.every(predicate)).toBe(expected, {x: true});
+    expectObservable(source.pipe(every(predicate))).toBe(expected, {x: true});
     expectSubscriptions(source.subscriptions).toBe(sourceSubs);
   });
 });

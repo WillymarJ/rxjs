@@ -1,20 +1,15 @@
 import { expect } from 'chai';
-import * as Rx from '../../dist/package/Rx';
-import { GroupedObservable } from '../../dist/package/operators/groupBy';
-import marbleTestingSignature = require('../helpers/marble-testing'); // tslint:disable-line:no-require-imports
+import { groupBy, delay, tap, map, take, mergeMap, materialize, skip } from 'rxjs/operators';
+import { TestScheduler } from 'rxjs/testing';
+import { ReplaySubject, of, GroupedObservable, Observable, Operator, Observer } from 'rxjs';
+import { hot, cold, expectObservable, expectSubscriptions } from '../helpers/marble-testing';
 
-declare const { asDiagram };
-declare const hot: typeof marbleTestingSignature.hot;
-declare const cold: typeof marbleTestingSignature.cold;
-declare const expectObservable: typeof marbleTestingSignature.expectObservable;
-declare const expectSubscriptions: typeof marbleTestingSignature.expectSubscriptions;
+declare function asDiagram(arg: string): Function;
 
-declare const rxTestScheduler: Rx.TestScheduler;
-const Observable = Rx.Observable;
-const ReplaySubject = Rx.ReplaySubject;
+declare const rxTestScheduler: TestScheduler;
 
 /** @test {groupBy} */
-describe('Observable.prototype.groupBy', () => {
+describe('groupBy operator', () => {
   asDiagram('groupBy(i => i % 2)')('should group numbers by odd/even', () => {
     const e1 =   hot('--1---2---3---4---5---|');
     const expected = '--x---y---------------|';
@@ -23,15 +18,15 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { x: x, y: y };
 
     const source = e1
-      .groupBy((val: string) => parseInt(val) % 2);
+      .pipe(groupBy((val: string) => parseInt(val) % 2));
     expectObservable(source).toBe(expected, expectedValues);
   });
 
-  function reverseString(str) {
+  function reverseString(str: string) {
     return str.split('').reverse().join('');
   }
 
-  function mapObject(obj, fn) {
+  function mapObject(obj: object, fn: Function) {
     const out = {};
     for (const p in obj) {
       if (obj.hasOwnProperty(p)) {
@@ -47,9 +42,9 @@ describe('Observable.prototype.groupBy', () => {
       { key: 0, values: [2] }
     ];
 
-    Observable.of(1, 2, 3)
-      .groupBy((x: number) => x % 2)
-      .subscribe((g: any) => {
+    of(1, 2, 3).pipe(
+      groupBy((x: number) => x % 2)
+    ).subscribe((g: any) => {
         const expectedGroup = expectedGroups.shift();
         expect(g.key).to.equal(expectedGroup.key);
 
@@ -65,9 +60,9 @@ describe('Observable.prototype.groupBy', () => {
       { key: 0, values: ['2!'] }
     ];
 
-    Observable.of(1, 2, 3)
-      .groupBy((x: number) => x % 2, (x: number) => x + '!')
-      .subscribe((g: any) => {
+    of(1, 2, 3).pipe(
+      groupBy((x: number) => x % 2, (x: number) => x + '!')
+    ).subscribe((g: any) => {
         const expectedGroup = expectedGroups.shift();
         expect(g.key).to.equal(expectedGroup.key);
 
@@ -85,15 +80,15 @@ describe('Observable.prototype.groupBy', () => {
       { key: 0, values: [6] }
     ];
 
-    const resultingGroups = [];
+    const resultingGroups: { key: number, values: number [] }[] = [];
 
-    Observable.of(1, 2, 3, 4, 5, 6)
-      .groupBy(
+    of(1, 2, 3, 4, 5, 6).pipe(
+      groupBy(
         (x: number) => x % 2,
         (x: number) => x,
-        (g: any) => g.skip(1))
-      .subscribe((g: any) => {
-        let group = { key: g.key, values: [] };
+        (g: any) => g.pipe(skip(1)))
+      ).subscribe((g: any) => {
+        let group = { key: g.key, values: [] as number[] };
 
         g.subscribe((x: any) => {
           group.values.push(x);
@@ -111,12 +106,12 @@ describe('Observable.prototype.groupBy', () => {
       { key: 0, values: [2] }
     ];
 
-    Observable.of(1, 2, 3)
-      .groupBy((x: number) => x % 2, null, null, () => new ReplaySubject(1))
+    of(1, 2, 3).pipe(
+      groupBy((x: number) => x % 2, null, null, () => new ReplaySubject(1)),
       // Ensure each inner group reaches the destination after the first event
       // has been next'd to the group
-      .delay(5)
-      .subscribe((g: any) => {
+      delay(5)
+    ).subscribe((g: any) => {
         const expectedGroup = expectedGroups.shift();
         expect(g.key).to.equal(expectedGroup.key);
 
@@ -132,7 +127,7 @@ describe('Observable.prototype.groupBy', () => {
     const expected = '|';
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -144,7 +139,7 @@ describe('Observable.prototype.groupBy', () => {
     const expected = '-';
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -156,7 +151,7 @@ describe('Observable.prototype.groupBy', () => {
     const expected = '#';
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -171,7 +166,7 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { g: g };
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -202,7 +197,7 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { w: w, x: x, y: y, z: z };
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -218,13 +213,14 @@ describe('Observable.prototype.groupBy', () => {
     const expected =      '--g------|';
     const expectedValues = { g: 'foo' };
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .do((group: any) => {
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      tap((group: any) => {
         expect(group.key).to.equal('foo');
         expect(group instanceof GroupedObservable).to.be.true;
-      })
-      .map((group: any) => { return group.key; });
+      }),
+      map((group: any) => { return group.key; })
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -250,9 +246,10 @@ describe('Observable.prototype.groupBy', () => {
     const expected =      '--w---x---y-z-------------|';
     const expectedValues = { w: 'foo', x: 'bar', y: 'baz', z: 'qux' };
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .map((g: any) => g.key);
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      map((g: any) => g.key)
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -278,9 +275,10 @@ describe('Observable.prototype.groupBy', () => {
     const expected =      '--w---x---y-z-------------#';
     const expectedValues = { w: 'foo', x: 'bar', y: 'baz', z: 'qux' };
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .map((g: any) => g.key);
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      map((g: any) => g.key)
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -311,7 +309,7 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { w: w, x: x, y: y, z: z };
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -338,9 +336,10 @@ describe('Observable.prototype.groupBy', () => {
     const expected =      '--w---x---y-';
     const expectedValues = { w: 'foo', x: 'bar', y: 'baz' };
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .map((group: any) => group.key);
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      map((group: any) => group.key)
+    );
 
     expectObservable(source, unsub).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -365,10 +364,13 @@ describe('Observable.prototype.groupBy', () => {
     const e1subs =        '^ !';
     const expected =      '--(a|)';
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .take(1)
-      .mergeMap((group: any) => group.take(1));
+    const source = e1.pipe(
+      groupBy(val => val.toLowerCase().trim()),
+      take(1),
+      mergeMap(group => group.pipe(
+        take(1)
+      ))
+    );
 
     expectObservable(source).toBe(expected, values);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -395,10 +397,11 @@ describe('Observable.prototype.groupBy', () => {
     const unsub =         '           !';
     const expectedValues = { w: 'foo', x: 'bar', y: 'baz' };
 
-    const source = e1
-      .mergeMap((x: string) => Observable.of(x))
-      .groupBy((x: string) => x.toLowerCase().trim())
-      .mergeMap((group: any) => Observable.of(group.key));
+    const source = e1.pipe(
+      mergeMap((x: string) => of(x)),
+      groupBy((x: string) => x.toLowerCase().trim()),
+      mergeMap((group: any) => of(group.key))
+    );
 
     expectObservable(source, unsub).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -430,13 +433,13 @@ describe('Observable.prototype.groupBy', () => {
 
     let invoked = 0;
     const source = e1
-      .groupBy((val: string) => {
+      .pipe(groupBy((val: string) => {
         invoked++;
         if (invoked === 10) {
           throw 'error';
         }
         return val.toLowerCase().trim();
-      });
+      }));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -470,14 +473,14 @@ describe('Observable.prototype.groupBy', () => {
 
     let invoked = 0;
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim(),
+      .pipe(groupBy((val: string) => val.toLowerCase().trim(),
         (val: string) => {
         invoked++;
         if (invoked === 10) {
           throw 'error';
         }
         return reverseString(val);
-      });
+      }));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -506,7 +509,7 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { w: w, x: x };
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim());
+      .pipe(groupBy((val: string) => val.toLowerCase().trim()));
 
     expectObservable(source, unsub).toBe(expected, expectedValues);
   });
@@ -535,26 +538,27 @@ describe('Observable.prototype.groupBy', () => {
     const z =             '------------f-------------|';
 
     const expectedGroups = {
-      w: Rx.TestScheduler.parseMarbles(w, values),
-      x: Rx.TestScheduler.parseMarbles(x, values),
-      y: Rx.TestScheduler.parseMarbles(y, values),
-      z: Rx.TestScheduler.parseMarbles(z, values)
+      w: TestScheduler.parseMarbles(w, values),
+      x: TestScheduler.parseMarbles(x, values),
+      y: TestScheduler.parseMarbles(y, values),
+      z: TestScheduler.parseMarbles(z, values)
     };
 
-    const fooUnsubscriptionFrame = Rx.TestScheduler
+    const fooUnsubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(unsubw)
       .unsubscribedFrame;
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .map((group: any) => {
-        const arr = [];
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      map((group: any) => {
+        const arr: any[] = [];
 
-        const subscription = group
-          .materialize()
-          .map((notification: Rx.Notification<any>) => {
+        const subscription = group.pipe(
+          materialize(),
+          map((notification: Notification) => {
             return { frame: rxTestScheduler.frame, notification: notification };
-          }).subscribe((value: any) => {
+          })
+        ).subscribe((value: any) => {
             arr.push(value);
           });
 
@@ -564,7 +568,8 @@ describe('Observable.prototype.groupBy', () => {
           }, fooUnsubscriptionFrame - rxTestScheduler.frame);
         }
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
   });
@@ -596,29 +601,30 @@ describe('Observable.prototype.groupBy', () => {
     const unsubz =        '                   !';
 
     const expectedGroups = {
-      w: Rx.TestScheduler.parseMarbles(w, values),
-      x: Rx.TestScheduler.parseMarbles(x, values),
-      y: Rx.TestScheduler.parseMarbles(y, values),
-      z: Rx.TestScheduler.parseMarbles(z, values)
+      w: TestScheduler.parseMarbles(w, values),
+      x: TestScheduler.parseMarbles(x, values),
+      y: TestScheduler.parseMarbles(y, values),
+      z: TestScheduler.parseMarbles(z, values)
     };
 
     const unsubscriptionFrames = {
-      foo: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubw).unsubscribedFrame,
-      bar: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubx).unsubscribedFrame,
-      baz: Rx.TestScheduler.parseMarblesAsSubscriptions(unsuby).unsubscribedFrame,
-      qux: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubz).unsubscribedFrame
+      foo: TestScheduler.parseMarblesAsSubscriptions(unsubw).unsubscribedFrame,
+      bar: TestScheduler.parseMarblesAsSubscriptions(unsubx).unsubscribedFrame,
+      baz: TestScheduler.parseMarblesAsSubscriptions(unsuby).unsubscribedFrame,
+      qux: TestScheduler.parseMarblesAsSubscriptions(unsubz).unsubscribedFrame
     };
 
-    const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .map((group: any) => {
-        const arr = [];
+    const source = e1.pipe(
+      groupBy((val: string) => val.toLowerCase().trim()),
+      map((group: any) => {
+        const arr: any[] = [];
 
-        const subscription = group
-          .materialize()
-          .map((notification: Rx.Notification<any>) => {
+        const subscription = group.pipe(
+          materialize(),
+          map((notification: Notification) => {
             return { frame: rxTestScheduler.frame, notification: notification };
-          }).subscribe((value: any) => {
+          })
+        ).subscribe((value: any) => {
             arr.push(value);
           });
 
@@ -626,7 +632,8 @@ describe('Observable.prototype.groupBy', () => {
           subscription.unsubscribe();
         }, unsubscriptionFrames[group.key] - rxTestScheduler.frame);
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
   });
@@ -643,7 +650,7 @@ describe('Observable.prototype.groupBy', () => {
     const subs =     '^                         !';
     const expected = '----------------------------|';
 
-    e1.groupBy((val: string) => val.toLowerCase().trim())
+    e1.pipe(groupBy((val: string) => val.toLowerCase().trim()))
       .subscribe((group: any) => {
         rxTestScheduler.schedule(() => {
           expectObservable(group).toBe(expected);
@@ -664,7 +671,7 @@ describe('Observable.prototype.groupBy', () => {
     const subs =     '^                         !';
     const expected = '----------------------------#';
 
-    e1.groupBy((val: string) => val.toLowerCase().trim())
+    e1.pipe(groupBy((val: string) => val.toLowerCase().trim()))
       .subscribe((group: any) => {
         rxTestScheduler.schedule(() => {
           expectObservable(group).toBe(expected);
@@ -691,13 +698,15 @@ describe('Observable.prototype.groupBy', () => {
     const outerValues = { w: 'foo' };
 
     const source = e1
-      .groupBy((val: string) => val.toLowerCase().trim())
-      .do((group: any) => {
-        rxTestScheduler.schedule(() => {
-          expectObservable(group).toBe(expectedInner);
-        }, 260);
-      })
-      .map((group: any) => { return group.key; });
+      .pipe(
+        groupBy((val: string) => val.toLowerCase().trim()),
+        tap((group: any) => {
+          rxTestScheduler.schedule(() => {
+            expectObservable(group).toBe(expectedInner);
+          }, 260);
+        }),
+        map((group: any) => { return group.key; })
+    );
 
     expectObservable(source, unsub).toBe(expectedOuter, outerValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -730,11 +739,11 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y, z: z };
 
     const source = e1
-      .groupBy(
+      .pipe(groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => reverseString(val),
-        (group: any) => group.skip(2)
-      );
+        (group: any) => group.pipe(skip(2))
+      ));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -766,11 +775,11 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y, z: z };
 
     const source = e1
-      .groupBy(
+      .pipe(groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => reverseString(val),
-        (group: any) => group.skip(2).map(() => { throw 'error'; })
-      );
+        (group: any) => group.pipe(skip(2), map(() => { throw 'error'; }))
+      ));
     expectObservable(source).toBe(expected, expectedValues);
   });
 
@@ -800,11 +809,11 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y, z: z };
 
     const source = e1
-      .groupBy(
+      .pipe(groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(2)
-      );
+        (group: any) => group.pipe(skip(2))
+      ));
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -834,11 +843,11 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x };
 
     const source = e1
-      .groupBy(
+      .pipe(groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) =>  group.skip(2)
-      );
+        (group: any) =>  group.pipe(skip(2))
+      ));
 
     expectObservable(source, unsub).toBe(expected, expectedValues);
   });
@@ -867,30 +876,30 @@ describe('Observable.prototype.groupBy', () => {
     const x =             '----------e-';
 
     const expectedGroups = {
-      v: Rx.TestScheduler.parseMarbles(v, values),
-      w: Rx.TestScheduler.parseMarbles(w, values),
-      x: Rx.TestScheduler.parseMarbles(x, values)
+      v: TestScheduler.parseMarbles(v, values),
+      w: TestScheduler.parseMarbles(w, values),
+      x: TestScheduler.parseMarbles(x, values)
     };
 
-    const unsubscriptionFrame = Rx.TestScheduler
+    const unsubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(unsub)
       .unsubscribedFrame;
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(2)
-      )
-      .map((group: any) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(2))
+      ),
+      map((group: any) => {
+        const arr: any[] = [];
 
-        const subscription = group
-          .materialize()
-          .map((notification: Rx.Notification<any>) => {
+        const subscription = group.pipe(
+          materialize(),
+          map((notification: Notification) => {
             return { frame: rxTestScheduler.frame, notification: notification };
           })
-          .subscribe((value: any) => {
+        ).subscribe((value: any) => {
             arr.push(value);
           });
 
@@ -898,7 +907,8 @@ describe('Observable.prototype.groupBy', () => {
           subscription.unsubscribe();
         }, unsubscriptionFrame - rxTestScheduler.frame);
         return arr;
-      });
+      })
+    );
 
     expectObservable(source, unsub).toBe(expected, expectedGroups);
   });
@@ -919,15 +929,15 @@ describe('Observable.prototype.groupBy', () => {
       cold(dur)
     ];
 
-    const unsubscribedFrame = Rx.TestScheduler
+    const unsubscribedFrame = TestScheduler
       .parseMarblesAsSubscriptions(sub)
       .unsubscribedFrame;
 
-    obs.groupBy(
+    obs.pipe(groupBy(
       (val: string) => val,
       (val: string) => val,
       (group: any) => durations[group.key]
-    ).subscribe();
+    )).subscribe();
 
     rxTestScheduler.schedule(() => {
       durations.forEach((d, i) => {
@@ -962,8 +972,8 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y, z: z };
 
     let invoked = 0;
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: any) => {
           invoked++;
           if (invoked === 10) {
@@ -972,8 +982,9 @@ describe('Observable.prototype.groupBy', () => {
           return val.toLowerCase().trim();
         },
         (val: string) => val,
-        (group: any) => group.skip(2)
-      );
+        (group: any) => group.pipe(skip(2))
+      )
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1005,8 +1016,8 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y, z: z };
 
     let invoked = 0;
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => {
           invoked++;
@@ -1015,8 +1026,9 @@ describe('Observable.prototype.groupBy', () => {
           }
           return val;
         },
-        (group: any) => group.skip(2)
-      );
+        (group: any) => group.pipe(skip(2))
+      )
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1047,8 +1059,8 @@ describe('Observable.prototype.groupBy', () => {
     const expectedValues = { v: v, w: w, x: x, y: y };
 
     let invoked = 0;
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
         (group: any) => {
@@ -1056,9 +1068,10 @@ describe('Observable.prototype.groupBy', () => {
           if (invoked === 4) {
             throw 'error';
           }
-          return group.skip(2);
+          return group.pipe(skip(2));
         }
-      );
+      )
+    );
 
     expectObservable(source).toBe(expected, expectedValues);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1092,32 +1105,32 @@ describe('Observable.prototype.groupBy', () => {
     const z =             '------------------i-----l-|';
 
     const expectedGroups = {
-      v: Rx.TestScheduler.parseMarbles(v, reversedValues),
-      w: Rx.TestScheduler.parseMarbles(w, reversedValues),
-      x: Rx.TestScheduler.parseMarbles(x, reversedValues),
-      y: Rx.TestScheduler.parseMarbles(y, reversedValues),
-      z: Rx.TestScheduler.parseMarbles(z, reversedValues)
+      v: TestScheduler.parseMarbles(v, reversedValues),
+      w: TestScheduler.parseMarbles(w, reversedValues),
+      x: TestScheduler.parseMarbles(x, reversedValues),
+      y: TestScheduler.parseMarbles(y, reversedValues),
+      z: TestScheduler.parseMarbles(z, reversedValues)
     };
 
-    const fooUnsubscriptionFrame = Rx.TestScheduler
+    const fooUnsubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(unsubv)
       .unsubscribedFrame;
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => reverseString(val),
-        (group: any) => group.skip(2)
-      )
-      .map((group: any, index: number) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(2))
+      ),
+      map((group: any, index: number) => {
+        const arr: any[] = [];
 
-        const subscription = group
-          .materialize()
-          .map((notification: Rx.Notification<any>) => {
+        const subscription = group.pipe(
+          materialize(),
+          map((notification: Notification) => {
             return { frame: rxTestScheduler.frame, notification: notification };
           })
-          .subscribe((value: any) => {
+        ).subscribe((value: any) => {
             arr.push(value);
           });
 
@@ -1127,7 +1140,8 @@ describe('Observable.prototype.groupBy', () => {
           }, fooUnsubscriptionFrame - rxTestScheduler.frame);
         }
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1164,37 +1178,37 @@ describe('Observable.prototype.groupBy', () => {
     const unsubz =        '                      !'    ;
 
     const expectedGroups = {
-      v: Rx.TestScheduler.parseMarbles(v, values),
-      w: Rx.TestScheduler.parseMarbles(w, values),
-      x: Rx.TestScheduler.parseMarbles(x, values),
-      y: Rx.TestScheduler.parseMarbles(y, values),
-      z: Rx.TestScheduler.parseMarbles(z, values)
+      v: TestScheduler.parseMarbles(v, values),
+      w: TestScheduler.parseMarbles(w, values),
+      x: TestScheduler.parseMarbles(x, values),
+      y: TestScheduler.parseMarbles(y, values),
+      z: TestScheduler.parseMarbles(z, values)
     };
 
     const unsubscriptionFrames = {
-      foo: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubv).unsubscribedFrame,
-      bar: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubw).unsubscribedFrame,
-      baz: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubx).unsubscribedFrame,
-      qux: Rx.TestScheduler.parseMarblesAsSubscriptions(unsuby).unsubscribedFrame,
-      foo2: Rx.TestScheduler.parseMarblesAsSubscriptions(unsubz).unsubscribedFrame
+      foo: TestScheduler.parseMarblesAsSubscriptions(unsubv).unsubscribedFrame,
+      bar: TestScheduler.parseMarblesAsSubscriptions(unsubw).unsubscribedFrame,
+      baz: TestScheduler.parseMarblesAsSubscriptions(unsubx).unsubscribedFrame,
+      qux: TestScheduler.parseMarblesAsSubscriptions(unsuby).unsubscribedFrame,
+      foo2: TestScheduler.parseMarblesAsSubscriptions(unsubz).unsubscribedFrame
     };
     const hasUnsubscribed = {};
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(2)
-      )
-      .map((group: any) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(2))
+      ),
+      map((group: any) => {
+        const arr: any[] = [];
 
-        const subscription = group
-          .materialize()
-          .map((notification: Rx.Notification<any>) => {
+        const subscription = group.pipe(
+          materialize(),
+          map((notification: Notification) => {
             return { frame: rxTestScheduler.frame, notification: notification };
           })
-          .subscribe((value: any) => {
+        ).subscribe((value: any) => {
             arr.push(value);
           });
 
@@ -1206,7 +1220,8 @@ describe('Observable.prototype.groupBy', () => {
           hasUnsubscribed[group.key] = true;
         }, unsubscriptionFrame - rxTestScheduler.frame);
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1240,40 +1255,42 @@ describe('Observable.prototype.groupBy', () => {
      const y =             '            ------------------|'; // qux
 
      const expectedGroups = {
-       v: Rx.TestScheduler.parseMarbles(v, values),
-       w: Rx.TestScheduler.parseMarbles(w, values),
-       x: Rx.TestScheduler.parseMarbles(x, values),
-       y: Rx.TestScheduler.parseMarbles(y, values),
+       v: TestScheduler.parseMarbles(v, values),
+       w: TestScheduler.parseMarbles(w, values),
+       x: TestScheduler.parseMarbles(x, values),
+       y: TestScheduler.parseMarbles(y, values),
      };
 
      const subscriptionFrames = {
-       foo: Rx.TestScheduler.parseMarblesAsSubscriptions(subv).subscribedFrame,
-       bar: Rx.TestScheduler.parseMarblesAsSubscriptions(subw).subscribedFrame,
-       baz: Rx.TestScheduler.parseMarblesAsSubscriptions(subx).subscribedFrame,
-       qux: Rx.TestScheduler.parseMarblesAsSubscriptions(suby).subscribedFrame,
+       foo: TestScheduler.parseMarblesAsSubscriptions(subv).subscribedFrame,
+       bar: TestScheduler.parseMarblesAsSubscriptions(subw).subscribedFrame,
+       baz: TestScheduler.parseMarblesAsSubscriptions(subx).subscribedFrame,
+       qux: TestScheduler.parseMarblesAsSubscriptions(suby).subscribedFrame,
      };
 
-     const result = e1
-       .groupBy(
+     const result = e1.pipe(
+       groupBy(
          (val: string) => val.toLowerCase().trim(),
          (val: string) => val
-       ).map((group: any) => {
-         const innerNotifications = [];
+       ),
+       map((group: any) => {
+         const innerNotifications: any[] = [];
          const subscriptionFrame = subscriptionFrames[group.key];
 
          rxTestScheduler.schedule(() => {
-           group
-             .materialize()
-             .map((notification: Rx.Notification<any>) => {
-               return { frame: rxTestScheduler.frame, notification: notification };
-             })
-             .subscribe((value: any) => {
+           group.pipe(
+              materialize(),
+              map((notification: Notification) => {
+                return { frame: rxTestScheduler.frame, notification: notification };
+              })
+            ).subscribe((value: any) => {
                innerNotifications.push(value);
              });
          }, subscriptionFrame - rxTestScheduler.frame);
 
          return innerNotifications;
-       });
+       })
+      );
 
      expectObservable(result).toBe(expected, expectedGroups);
      expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1294,35 +1311,36 @@ describe('Observable.prototype.groupBy', () => {
     const g =             '--------------------------------|';
 
     const expectedGroups = {
-      g: Rx.TestScheduler.parseMarbles(g, values)
+      g: TestScheduler.parseMarbles(g, values)
     };
 
-    const innerSubscriptionFrame = Rx.TestScheduler
+    const innerSubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(innerSub)
       .subscribedFrame;
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(7)
-      )
-      .map((group: any) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(7))
+      ),
+      map((group: any) => {
+        const arr: any[] = [];
 
         rxTestScheduler.schedule(() => {
-          group
-            .materialize()
-            .map((notification: Rx.Notification<any>) => {
+          group.pipe(
+            materialize(),
+            map((notification: Notification) => {
               return { frame: rxTestScheduler.frame, notification: notification };
             })
-            .subscribe((value: any) => {
+          ).subscribe((value: any) => {
               arr.push(value);
             });
         }, innerSubscriptionFrame - rxTestScheduler.frame);
 
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1343,35 +1361,36 @@ describe('Observable.prototype.groupBy', () => {
     const g =             '--------------------------------#';
 
     const expectedGroups = {
-      g: Rx.TestScheduler.parseMarbles(g, values)
+      g: TestScheduler.parseMarbles(g, values)
     };
 
-    const innerSubscriptionFrame = Rx.TestScheduler
+    const innerSubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(innerSub)
       .subscribedFrame;
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(7)
-      )
-      .map((group: any) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(7))
+      ),
+      map((group: any) => {
+        const arr: any[] = [];
 
         rxTestScheduler.schedule(() => {
-          group
-            .materialize()
-            .map((notification: Rx.Notification<any>) => {
+          group.pipe(
+            materialize(),
+            map((notification: Notification) => {
               return { frame: rxTestScheduler.frame, notification: notification };
             })
-            .subscribe((value: any) => {
+          ).subscribe((value: any) => {
               arr.push(value);
             });
         }, innerSubscriptionFrame - rxTestScheduler.frame);
 
         return arr;
-      });
+      })
+    );
 
     expectObservable(source).toBe(expected, expectedGroups);
     expectSubscriptions(e1.subscriptions).toBe(e1subs);
@@ -1394,43 +1413,44 @@ describe('Observable.prototype.groupBy', () => {
     const g =                                             '-';
 
     const expectedGroups = {
-      g: Rx.TestScheduler.parseMarbles(g, values)
+      g: TestScheduler.parseMarbles(g, values)
     };
 
-    const innerSubscriptionFrame = Rx.TestScheduler
+    const innerSubscriptionFrame = TestScheduler
       .parseMarblesAsSubscriptions(innerSub)
       .subscribedFrame;
 
-    const source = e1
-      .groupBy(
+    const source = e1.pipe(
+      groupBy(
         (val: string) => val.toLowerCase().trim(),
         (val: string) => val,
-        (group: any) => group.skip(7)
-      )
-      .map((group: any) => {
-        const arr = [];
+        (group: any) => group.pipe(skip(7))
+      ),
+      map((group: any) => {
+        const arr: any[] = [];
 
         rxTestScheduler.schedule(() => {
-          group
-            .materialize()
-            .map((notification: Rx.Notification<any>) => {
+          group.pipe(
+            materialize(),
+            map((notification: Notification) => {
               return { frame: rxTestScheduler.frame, notification: notification };
             })
-            .subscribe((value: any) => {
+          ).subscribe((value: any) => {
               arr.push(value);
             });
         }, innerSubscriptionFrame - rxTestScheduler.frame);
 
         return arr;
-      });
+      })
+    );
 
     expectObservable(source, unsub).toBe(expected, expectedGroups);
     expectSubscriptions(e1.subscriptions).toBe(expectedSubs);
   });
 
   it('should not break lift() composability', (done: MochaDone) => {
-    class MyCustomObservable<T> extends Rx.Observable<T> {
-      lift<R>(operator: Rx.Operator<T, R>): Rx.Observable<R> {
+    class MyCustomObservable<T> extends Observable<T> {
+      lift<R>(operator: Operator<T, R>): Observable<R> {
         const observable = new MyCustomObservable<R>();
         (<any>observable).source = this;
         (<any>observable).operator = operator;
@@ -1438,15 +1458,15 @@ describe('Observable.prototype.groupBy', () => {
       }
     }
 
-    const result = new MyCustomObservable((observer: Rx.Observer<number>) => {
+    const result = new MyCustomObservable((observer: Observer<number>) => {
       observer.next(1);
       observer.next(2);
       observer.next(3);
       observer.complete();
-    }).groupBy(
+    }).pipe(groupBy(
       (x: number) => x % 2,
       (x: number) => x + '!'
-    );
+    ));
 
     expect(result instanceof MyCustomObservable).to.be.true;
 
